@@ -1,0 +1,336 @@
+{
+    "name": "PVB Creative Brief to Image Generation (Weavy)",
+    "description": "Trigger: Notion page marked as 'Listo para generar imágenes' → Extract brief details → Generate 5 image variations via Weavy → Save to Google Drive → Update Notion with link",
+    "nodes": [
+        {
+            "parameters": {
+                "triggerOn": "data",
+                "event": "Document Updated",
+                "database": "={{ $notionDatabase }}",
+                "properties": {
+                    "propertyName": "Listo para generar imágenes"
+                }
+            },
+            "name": "Notion Trigger - Brief Ready",
+            "type": "n8n-nodes-base.notion",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ],
+            "credentials": {
+                "notionApi": "notion_api"
+            }
+        },
+        {
+            "parameters": {
+                "operation": "get",
+                "databaseId": "={{ $notionDatabase }}",
+                "returnAll": false,
+                "limit": 1,
+                "filterType": "manual",
+                "filter": {
+                    "condition": "and",
+                    "value": [
+                        {
+                            "condition": "equals",
+                            "key": "Listo para generar imágenes",
+                            "value": true
+                        }
+                    ]
+                }
+            },
+            "name": "Fetch Latest Brief from Notion",
+            "type": "n8n-nodes-base.notion",
+            "typeVersion": 1,
+            "position": [
+                450,
+                300
+            ],
+            "credentials": {
+                "notionApi": "notion_api"
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "// Extract brief details from Notion page\nconst briefData = $json.body[0].properties;\n\nreturn {\n  client_name: briefData['Cliente']?.title?.[0]?.plain_text || 'Unknown',\n  project_description: briefData['Descripción del proyecto']?.rich_text?.[0]?.plain_text || '',\n  visual_style: briefData['Estilo visual']?.select?.name || 'neutral',\n  color_palette: briefData['Paleta de colores']?.rich_text?.[0]?.plain_text || '',\n  target_audience: briefData['Público objetivo']?.rich_text?.[0]?.plain_text || '',\n  pvb_notes: briefData['Notas específicas PVB']?.rich_text?.[0]?.plain_text || '',\n  notion_page_id: $json.body[0].id\n};"
+            },
+            "name": "Extract Brief Details",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 1,
+            "position": [
+                650,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Build creative prompt for Weavy from brief details\nconst brief = $json;\n\nconst prompt = `\n🎨 CREATIVE BRIEF FOR IMAGE GENERATION:\n\nCLIENT: ${brief.client_name}\n\nPROJECT DESCRIPTION:\n${brief.project_description}\n\nVISUAL STYLE: ${brief.visual_style}\nCOLOR PALETTE: ${brief.color_palette}\nTARGET AUDIENCE: ${brief.target_audience}\n\nADDITIONAL NOTES (PVB):\n${brief.pvb_notes}\n\nGENERATE 5 DISTINCT VISUAL VARIATIONS that:\n1. Match the described style and colors\n2. Appeal to the target audience\n3. Reflect the project's core concept\n4. Are production-ready for portfolio/marketing use\n`;\n\nreturn {\n  ...brief,\n  creative_prompt: prompt\n};"
+            },
+            "name": "Build Creative Prompt",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 1,
+            "position": [
+                850,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.weavy.com/v1/designs/generate",
+                "authentication": "genericCredentialType",
+                "genericCredentials": "weavy_api_key",
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        },
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer {{ $credentials.weavy_api_key }}"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "brief",
+                            "value": "={{ $json.creative_prompt }}"
+                        },
+                        {
+                            "name": "variations",
+                            "value": 5
+                        },
+                        {
+                            "name": "style",
+                            "value": "={{ $json.visual_style }}"
+                        },
+                        {
+                            "name": "colors",
+                            "value": "={{ $json.color_palette }}"
+                        }
+                    ]
+                }
+            },
+            "name": "Weavy - Generate Images",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                1050,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Process Weavy response and prepare for Google Drive upload\nconst weavyResponse = $json;\nconst images = weavyResponse.variations || [];\n\nreturn {\n  total_images: images.length,\n  images: images.map((img, idx) => ({\n    url: img.url,\n    filename: `${$json.client_name}_variation_${idx + 1}.png`,\n    index: idx + 1\n  }))\n};"
+            },
+            "name": "Process Image Variations",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 1,
+            "position": [
+                1250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "createFolder",
+                "path": "/PVB Creative Briefs/{{ $json.client_name }} - {{ now().format('YYYY-MM-DD') }}"
+            },
+            "name": "Google Drive - Create Client Folder",
+            "type": "n8n-nodes-base.googleDrive",
+            "typeVersion": 2,
+            "position": [
+                1450,
+                200
+            ],
+            "credentials": {
+                "googleDriveOAuth2": "google_drive_oauth"
+            }
+        },
+        {
+            "parameters": {
+                "operation": "upload",
+                "parentFolderId": "={{ $json.folderId }}",
+                "binaryData": true,
+                "fileName": "={{ $json.filename }}"
+            },
+            "name": "Google Drive - Upload Each Image",
+            "type": "n8n-nodes-base.googleDrive",
+            "typeVersion": 2,
+            "position": [
+                1650,
+                300
+            ],
+            "credentials": {
+                "googleDriveOAuth2": "google_drive_oauth"
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "// Collect all uploaded image links\nconst uploadedImages = $json.files || [];\n\nconst imageLinks = uploadedImages.map(img => `[${img.name}](${img.webViewLink})`).join('\\n');\n\nreturn {\n  google_drive_folder_link: $json.folderLink,\n  image_links_markdown: imageLinks,\n  total_uploaded: uploadedImages.length\n};"
+            },
+            "name": "Format Google Drive Links",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 1,
+            "position": [
+                1850,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "update",
+                "pageId": "={{ $json.notion_page_id }}",
+                "properties": {
+                    "propertyName": "Google Drive Link",
+                    "value": "={{ $json.google_drive_folder_link }}"
+                }
+            },
+            "name": "Notion - Update with Drive Link",
+            "type": "n8n-nodes-base.notion",
+            "typeVersion": 1,
+            "position": [
+                2050,
+                300
+            ],
+            "credentials": {
+                "notionApi": "notion_api"
+            }
+        },
+        {
+            "parameters": {
+                "to": "pancho@pvbestudio.com",
+                "subject": "✅ Imágenes generadas - {{ $json.client_name }}",
+                "htmlMessage": "<h2>Variaciones de imagen generadas con éxito</h2>\n<p><strong>Cliente:</strong> {{ $json.client_name }}</p>\n<p><strong>Total de variaciones:</strong> {{ $json.total_images }}</p>\n<p><a href='{{ $json.google_drive_folder_link }}' target='_blank'>Ver en Google Drive</a></p>\n<p><strong>Estado Notion:</strong> ✅ Enlace actualizado automáticamente</p>"
+            },
+            "name": "Send Notification Email",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 1,
+            "position": [
+                2250,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Notion Trigger - Brief Ready": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Latest Brief from Notion",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Latest Brief from Notion": {
+            "main": [
+                [
+                    {
+                        "node": "Extract Brief Details",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Extract Brief Details": {
+            "main": [
+                [
+                    {
+                        "node": "Build Creative Prompt",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Build Creative Prompt": {
+            "main": [
+                [
+                    {
+                        "node": "Weavy - Generate Images",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Weavy - Generate Images": {
+            "main": [
+                [
+                    {
+                        "node": "Process Image Variations",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Process Image Variations": {
+            "main": [
+                [
+                    {
+                        "node": "Google Drive - Create Client Folder",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Google Drive - Upload Each Image",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Google Drive - Create Client Folder": {
+            "main": [
+                [
+                    {
+                        "node": "Google Drive - Upload Each Image",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Google Drive - Upload Each Image": {
+            "main": [
+                [
+                    {
+                        "node": "Format Google Drive Links",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format Google Drive Links": {
+            "main": [
+                [
+                    {
+                        "node": "Notion - Update with Drive Link",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Notion - Update with Drive Link": {
+            "main": [
+                [
+                    {
+                        "node": "Send Notification Email",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

@@ -1,0 +1,178 @@
+{
+    "name": "PVB Lead Notification & Follow-up",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "lead-notification"
+            },
+            "name": "Webhook - Lead from Chatbot",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "string": [
+                        {
+                            "value1": "={{ $json.lead_quality }}",
+                            "value2": "hot",
+                            "operation": "equals"
+                        }
+                    ]
+                }
+            },
+            "name": "Is Hot Lead?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                450,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "to": "pancho@pvbestudio.com",
+                "subject": "🔥 HOT LEAD - {{ $json.lead.name }}",
+                "htmlMessage": "<h2>Nuevo Lead Calificado</h2>\n<p><strong>Nombre:</strong> {{ $json.lead.name }}</p>\n<p><strong>WhatsApp:</strong> {{ $json.lead.phone_number }}</p>\n<p><strong>Email:</strong> {{ $json.lead.email }}</p>\n<p><strong>Empresa:</strong> {{ $json.lead.company }}</p>\n<p><strong>Servicio:</strong> {{ $json.lead.service_category }}</p>\n<p><strong>Presupuesto:</strong> {{ $json.lead.budget_range }}</p>\n<p><strong>Recomendación:</strong> {{ $json.recommended_service.service }}</p>\n<p><strong>Rango de Precio:</strong> {{ $json.recommended_service.price_range }}</p>"
+            },
+            "name": "Send Email to Pancho (Hot)",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 1,
+            "position": [
+                650,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "phoneNumber": "+56XXXXXXXXX",
+                "message": "Hola Pancho 🔥 Nuevo lead HOT!\n\nNombre: {{ $json.lead.name }}\nWhatsApp: {{ $json.lead.phone_number }}\nServicio: {{ $json.lead.service_category }}\nPresupuesto: {{ $json.lead.budget_range }}\n\n👉 Recomendación: {{ $json.recommended_service.service }}"
+            },
+            "name": "Send WhatsApp to Pancho (Hot)",
+            "type": "n8n-nodes-base.twilio",
+            "typeVersion": 1,
+            "position": [
+                650,
+                350
+            ]
+        },
+        {
+            "parameters": {
+                "to": "pancho@pvbestudio.com",
+                "subject": "📋 Lead - {{ $json.lead.name }}",
+                "htmlMessage": "<h2>Nuevo Lead (WARM/COLD)</h2>\n<p><strong>Nombre:</strong> {{ $json.lead.name }}</p>\n<p><strong>WhatsApp:</strong> {{ $json.lead.phone_number }}</p>\n<p><strong>Email:</strong> {{ $json.lead.email }}</p>\n<p><strong>Servicio:</strong> {{ $json.lead.service_category }}</p>\n<p><strong>Recomendación:</strong> {{ $json.recommended_service.service }}</p>"
+            },
+            "name": "Send Email to Pancho (Warm/Cold)",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 1,
+            "position": [
+                650,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://localhost:5000/api/leads",
+                "method": "POST",
+                "bodyParametersUi": "keyvalue",
+                "bodyParameters": {
+                    "values": [
+                        {
+                            "name": "phone_number",
+                            "value": "={{ $json.lead.phone_number }}"
+                        },
+                        {
+                            "name": "name",
+                            "value": "={{ $json.lead.name }}"
+                        },
+                        {
+                            "name": "status",
+                            "value": "notification_sent"
+                        }
+                    ]
+                }
+            },
+            "name": "Update Lead Status in DB",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 1,
+            "position": [
+                850,
+                400
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook - Lead from Chatbot": {
+            "main": [
+                [
+                    {
+                        "node": "Is Hot Lead?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Is Hot Lead?": {
+            "main": [
+                [
+                    {
+                        "node": "Send Email to Pancho (Hot)",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Send WhatsApp to Pancho (Hot)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Send Email to Pancho (Warm/Cold)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Send Email to Pancho (Hot)": {
+            "main": [
+                [
+                    {
+                        "node": "Update Lead Status in DB",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Send WhatsApp to Pancho (Hot)": {
+            "main": [
+                [
+                    {
+                        "node": "Update Lead Status in DB",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Send Email to Pancho (Warm/Cold)": {
+            "main": [
+                [
+                    {
+                        "node": "Update Lead Status in DB",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

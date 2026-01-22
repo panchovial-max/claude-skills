@@ -1,0 +1,109 @@
+{
+    "name": "PVB Auto Follow-up Sequence",
+    "nodes": [
+        {
+            "parameters": {
+                "trigger": "every",
+                "unit": "hours",
+                "value": 24
+            },
+            "name": "Every 24 Hours",
+            "type": "n8n-nodes-base.cron",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://localhost:5000/api/leads?status=qualified",
+                "method": "GET"
+            },
+            "name": "Get Qualified Leads from Yesterday",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 1,
+            "position": [
+                450,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://graph.instagram.com/v18.0/{{ env.META_PHONE_NUMBER_ID }}/messages",
+                "authentication": "generic",
+                "genericAuthType": "bearerToken",
+                "nodeCredentialType": "httpHeaderAuth",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "values": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer {{ env.META_ACCESS_TOKEN }}"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParametersUi": "json",
+                "jsonBody": "{\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $json.phone_number }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"Hola {{ $json.name }}, te escribo con el resumen de tu proyecto y las opciones que tenemos para ti. ¿Podemos agendar una llamada?\"\n  }\n}"
+            },
+            "name": "Send Follow-up Message",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 1,
+            "position": [
+                650,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "email": "={{ $json.email }}",
+                "subject": "Opciones de Servicio para tu Proyecto - PVB Estudio",
+                "htmlMessage": "<h2>Hola {{ $json.name }},</h2>\n<p>Gracias por tu interés en PVB Estudio Creativo.</p>\n<p>Basado en tu proyecto, te recomendamos:</p>\n<h3>{{ $json.recommended_service }}</h3>\n<p>Rango: {{ $json.budget_range }}</p>\n<p>¿Te gustaría agendar una llamada para discutir los detalles?</p>\n<p>Pancho está disponible para una consulta personalizada.</p>"
+            },
+            "name": "Send Follow-up Email",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 1,
+            "position": [
+                850,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Every 24 Hours": {
+            "main": [
+                [
+                    {
+                        "node": "Get Qualified Leads from Yesterday",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get Qualified Leads from Yesterday": {
+            "main": [
+                [
+                    {
+                        "node": "Send Follow-up Message",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Send Follow-up Message": {
+            "main": [
+                [
+                    {
+                        "node": "Send Follow-up Email",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}
