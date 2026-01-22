@@ -19,8 +19,8 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Database configuration
-database_url = os.getenv('DATABASE_URL', 'sqlite:///chatbot.db')
+# Database configuration - use /tmp for SQLite on Railway (writable directory)
+database_url = os.getenv('DATABASE_URL', 'sqlite:////tmp/chatbot.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -35,7 +35,11 @@ meta_api = whatsapp_api  # Keep backward compatibility
 # ============================================================================
 
 with app.app_context():
-    db.create_all()
+    try:
+        db.create_all()
+        print("✅ Database initialized successfully")
+    except Exception as e:
+        print(f"⚠️ Database initialization error: {e}")
 
 # ============================================================================
 # WEBHOOK VERIFICATION (GET request from Meta)
