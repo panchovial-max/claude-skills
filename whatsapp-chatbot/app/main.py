@@ -4,16 +4,15 @@ Handles webhook from Meta, processes messages, routes conversations
 """
 
 import os
-import json
+import sys
+
+# Print startup info for debugging
+print(f"🚀 Starting PVB WhatsApp Chatbot...")
+print(f"Python version: {sys.version}")
+
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from datetime import datetime
-
-from app.models.database import db, Lead, Conversation
-from app.utils.meta_api import MetaWhatsAppAPI
-from app.utils.twilio_api import TwilioWhatsAppAPI, get_whatsapp_api
-from app.flows.conversation_engine import route_flow, DataCapture, MarketingFlow, PhotographyFlow
-from app.utils.lead_router import LeadRouter
 
 load_dotenv()
 
@@ -24,22 +23,59 @@ database_url = os.getenv('DATABASE_URL', 'sqlite:////tmp/chatbot.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db.init_app(app)
+# Lazy imports to avoid startup crashes
+db = None
+Lead = None
+Conversation = None
+whatsapp_api = None
+meta_api = None
 
-# Initialize WhatsApp API - auto-selects Twilio if configured, otherwise Meta
-whatsapp_api = get_whatsapp_api()
-meta_api = whatsapp_api  # Keep backward compatibility
+def init_app():
+    """Initialize app components - called lazily"""
+    global db, Lead, Conversation, whatsapp_api, meta_api
 
-# ============================================================================
-# DATABASE INITIALIZATION
-# ============================================================================
+    if db is not None:
+        return  # Already initialized
 
-with app.app_context():
     try:
-        db.create_all()
-        print("✅ Database initialized successfully")
+        from app.models.database import db as _db, Lead as _Lead, Conversation as _Conversation
+        db = _db
+        Lead = _Lead
+        Conversation = _Conversation
+
+        db.init_app(app)
+
+        with app.app_context():
+            db.create_all()
+            print("✅ Database initialized successfully")
     except Exception as e:
         print(f"⚠️ Database initialization error: {e}")
+
+    try:
+        from app.utils.twilio_api import get_whatsapp_api
+        whatsapp_api = get_whatsapp_api()
+        meta_api = whatsapp_api
+        print("✅ WhatsApp API initialized")
+    except Exception as e:
+        print(f"⚠️ WhatsApp API initialization error: {e}")
+
+# ============================================================================
+# HEALTH CHECK - Must be before other routes for Railway healthcheck
+# ============================================================================
+
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'ok', 'message': 'PVB Chatbot is running'}), 200
+
+@app.route('/', methods=['GET'])
+def root():
+    return jsonify({'status': 'ok', 'app': 'PVB WhatsApp Chatbot', 'version': '1.0'}), 200
+
+# Initialize on first non-health request
+@app.before_request
+def before_request():
+    if request.endpoint not in ['health', 'root']:
+        init_app()
 
 # ============================================================================
 # WEBHOOK VERIFICATION (GET request from Meta)
@@ -420,13 +456,6 @@ def update_lead_status(lead_id):
     
     return jsonify(lead.to_dict())
 
-# ============================================================================
-# HEALTH CHECK
-# ============================================================================
-
-@app.route('/health', methods=['GET'])
-def health():
-    return jsonify({'status': 'ok', 'message': 'PVB Chatbot is running'}), 200
-
 if __name__ == '__main__':
+    init_app()
     app.run(debug=True, host='0.0.0.0', port=5000)
