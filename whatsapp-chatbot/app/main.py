@@ -37,27 +37,43 @@ def init_app():
     if db is not None:
         return  # Already initialized
 
+    print("🔄 Initializing app components...")
+
     try:
         from app.models.database import db as _db, Lead as _Lead, Conversation as _Conversation
         db = _db
         Lead = _Lead
         Conversation = _Conversation
-
-        db.init_app(app)
-
-        with app.app_context():
-            db.create_all()
-            print("✅ Database initialized successfully")
+        print(f"✅ Models imported: db={db}, Lead={Lead}")
     except Exception as e:
-        print(f"⚠️ Database initialization error: {e}")
+        print(f"❌ Model import error: {e}")
+        import traceback
+        traceback.print_exc()
+        return
+
+    try:
+        # Check if already initialized with app
+        if not hasattr(db, 'app') or db.app is None:
+            db.init_app(app)
+            print("✅ Database connected to app")
+    except Exception as e:
+        print(f"❌ db.init_app error: {e}")
+
+    try:
+        db.create_all()
+        print("✅ Database tables created")
+    except Exception as e:
+        print(f"❌ db.create_all error: {e}")
+        import traceback
+        traceback.print_exc()
 
     try:
         from app.utils.twilio_api import get_whatsapp_api
         whatsapp_api = get_whatsapp_api()
         meta_api = whatsapp_api
-        print("✅ WhatsApp API initialized")
+        print(f"✅ WhatsApp API initialized: {type(whatsapp_api)}")
     except Exception as e:
-        print(f"⚠️ WhatsApp API initialization error: {e}")
+        print(f"❌ WhatsApp API error: {e}")
 
 # ============================================================================
 # HEALTH CHECK - Must be before other routes for Railway healthcheck
