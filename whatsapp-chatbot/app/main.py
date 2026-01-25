@@ -410,18 +410,24 @@ def handle_message_status(status: dict):
 @app.route('/api/leads', methods=['GET'])
 def get_leads():
     """Get all leads (with filtering options)"""
+    if Lead is None:
+        return jsonify({'error': 'Database not initialized', 'leads': []}), 200
+
     status_filter = request.args.get('status')
     quality_filter = request.args.get('quality')
-    
-    query = Lead.query
-    
-    if status_filter:
-        query = query.filter_by(status=status_filter)
-    if quality_filter:
-        query = query.filter_by(lead_quality=quality_filter)
-    
-    leads = query.order_by(Lead.created_at.desc()).all()
-    return jsonify([lead.to_dict() for lead in leads])
+
+    try:
+        query = Lead.query
+
+        if status_filter:
+            query = query.filter_by(status=status_filter)
+        if quality_filter:
+            query = query.filter_by(lead_quality=quality_filter)
+
+        leads = query.order_by(Lead.created_at.desc()).all()
+        return jsonify([lead.to_dict() for lead in leads])
+    except Exception as e:
+        return jsonify({'error': str(e), 'leads': []}), 200
 
 @app.route('/api/leads/<int:lead_id>', methods=['GET'])
 def get_lead(lead_id):
