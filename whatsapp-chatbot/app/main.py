@@ -87,6 +87,21 @@ def health():
 def root():
     return jsonify({'status': 'ok', 'app': 'PVB WhatsApp Chatbot', 'version': '1.0'}), 200
 
+@app.route('/debug', methods=['GET'])
+def debug():
+    """Debug endpoint to check initialization status"""
+    init_app()  # Force init
+    return jsonify({
+        'db_initialized': db is not None,
+        'lead_model': Lead is not None,
+        'whatsapp_api': whatsapp_api is not None,
+        'db_type': str(type(db)) if db else None,
+        'env_vars': {
+            'DATABASE_URL': os.getenv('DATABASE_URL', 'not set')[:20] + '...' if os.getenv('DATABASE_URL') else 'not set',
+            'TWILIO_ACCOUNT_SID': 'set' if os.getenv('TWILIO_ACCOUNT_SID') else 'not set',
+        }
+    }), 200
+
 # Initialize on first non-health request
 @app.before_request
 def before_request():
