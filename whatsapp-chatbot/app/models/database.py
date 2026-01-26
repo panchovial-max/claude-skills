@@ -64,7 +64,7 @@ class Conversation(db.Model):
     message_text = db.Column(db.Text)
     sender = db.Column(db.String(20))  # 'bot' or 'user'
     flow_state = db.Column(db.String(100))  # tracking conversation step
-    metadata = db.Column(db.JSON)  # store answers to qualification questions
+    extra_data = db.Column(db.JSON)  # store answers to qualification questions
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     lead = db.relationship('Lead', back_populates='conversations')

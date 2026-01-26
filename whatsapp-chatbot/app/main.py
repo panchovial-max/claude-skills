@@ -401,7 +401,7 @@ def save_conversation(lead: Lead, message_text: str, sender: str, flow_state: st
         message_text=message_text,
         sender=sender,
         flow_state=flow_state,
-        metadata={'user_response': user_response} if user_response else {}
+        extra_data={'user_response': user_response} if user_response else {}
     )
     db.session.add(conversation)
     db.session.commit()
