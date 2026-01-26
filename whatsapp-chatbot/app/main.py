@@ -30,51 +30,56 @@ Conversation = None
 whatsapp_api = None
 meta_api = None
 
+_initialized = False
+
 def init_app():
     """Initialize app components - called lazily"""
-    global db, Lead, Conversation, whatsapp_api, meta_api
+    global db, Lead, Conversation, whatsapp_api, meta_api, _initialized
 
-    if db is not None:
+    if _initialized:
         return  # Already initialized
 
+    _initialized = True
     print("🔄 Initializing app components...")
 
     try:
-        from app.models.database import db as _db, Lead as _Lead, Conversation as _Conversation
+        # Try relative import first, then absolute
+        try:
+            from .models.database import db as _db, Lead as _Lead, Conversation as _Conversation
+        except ImportError:
+            from app.models.database import db as _db, Lead as _Lead, Conversation as _Conversation
+
         db = _db
         Lead = _Lead
         Conversation = _Conversation
         print(f"✅ Models imported: db={db}, Lead={Lead}")
-    except Exception as e:
-        print(f"❌ Model import error: {e}")
-        import traceback
-        traceback.print_exc()
-        return
 
-    try:
-        # Check if already initialized with app
-        if not hasattr(db, 'app') or db.app is None:
-            db.init_app(app)
-            print("✅ Database connected to app")
-    except Exception as e:
-        print(f"❌ db.init_app error: {e}")
+        # Initialize db with app
+        db.init_app(app)
+        print("✅ Database connected to app")
 
-    try:
+        # Create tables
         with app.app_context():
             db.create_all()
             print("✅ Database tables created")
+
     except Exception as e:
-        print(f"❌ db.create_all error: {e}")
+        print(f"❌ Database error: {e}")
         import traceback
         traceback.print_exc()
 
     try:
-        from app.utils.twilio_api import get_whatsapp_api
+        try:
+            from .utils.twilio_api import get_whatsapp_api
+        except ImportError:
+            from app.utils.twilio_api import get_whatsapp_api
         whatsapp_api = get_whatsapp_api()
         meta_api = whatsapp_api
         print(f"✅ WhatsApp API initialized: {type(whatsapp_api)}")
     except Exception as e:
         print(f"❌ WhatsApp API error: {e}")
+        import traceback
+        traceback.print_exc()
 
 # ============================================================================
 # HEALTH CHECK - Must be before other routes for Railway healthcheck
