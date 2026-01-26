@@ -60,8 +60,9 @@ def init_app():
         print(f"❌ db.init_app error: {e}")
 
     try:
-        db.create_all()
-        print("✅ Database tables created")
+        with app.app_context():
+            db.create_all()
+            print("✅ Database tables created")
     except Exception as e:
         print(f"❌ db.create_all error: {e}")
         import traceback
