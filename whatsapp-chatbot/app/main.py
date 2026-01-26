@@ -23,63 +23,28 @@ database_url = os.getenv('DATABASE_URL', 'sqlite:////tmp/chatbot.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Lazy imports to avoid startup crashes
-db = None
-Lead = None
-Conversation = None
-whatsapp_api = None
-meta_api = None
+# Initialize database at module level
+print("🔄 Importing database models...")
+from app.models.database import db, Lead, Conversation
+print(f"✅ Models imported")
 
-_initialized = False
+db.init_app(app)
+print("✅ Database connected to app")
+
+with app.app_context():
+    db.create_all()
+    print("✅ Database tables created")
+
+# Initialize WhatsApp API
+print("🔄 Initializing WhatsApp API...")
+from app.utils.twilio_api import get_whatsapp_api
+whatsapp_api = get_whatsapp_api()
+meta_api = whatsapp_api
+print(f"✅ WhatsApp API initialized")
 
 def init_app():
-    """Initialize app components - called lazily"""
-    global db, Lead, Conversation, whatsapp_api, meta_api, _initialized
-
-    if _initialized:
-        return  # Already initialized
-
-    _initialized = True
-    print("🔄 Initializing app components...")
-
-    try:
-        # Try relative import first, then absolute
-        try:
-            from .models.database import db as _db, Lead as _Lead, Conversation as _Conversation
-        except ImportError:
-            from app.models.database import db as _db, Lead as _Lead, Conversation as _Conversation
-
-        db = _db
-        Lead = _Lead
-        Conversation = _Conversation
-        print(f"✅ Models imported: db={db}, Lead={Lead}")
-
-        # Initialize db with app
-        db.init_app(app)
-        print("✅ Database connected to app")
-
-        # Create tables
-        with app.app_context():
-            db.create_all()
-            print("✅ Database tables created")
-
-    except Exception as e:
-        print(f"❌ Database error: {e}")
-        import traceback
-        traceback.print_exc()
-
-    try:
-        try:
-            from .utils.twilio_api import get_whatsapp_api
-        except ImportError:
-            from app.utils.twilio_api import get_whatsapp_api
-        whatsapp_api = get_whatsapp_api()
-        meta_api = whatsapp_api
-        print(f"✅ WhatsApp API initialized: {type(whatsapp_api)}")
-    except Exception as e:
-        print(f"❌ WhatsApp API error: {e}")
-        import traceback
-        traceback.print_exc()
+    """Kept for compatibility - now a no-op since we initialize at module level"""
+    pass
 
 # ============================================================================
 # HEALTH CHECK - Must be before other routes for Railway healthcheck
@@ -96,23 +61,17 @@ def root():
 @app.route('/debug', methods=['GET'])
 def debug():
     """Debug endpoint to check initialization status"""
-    init_app()  # Force init
     return jsonify({
         'db_initialized': db is not None,
         'lead_model': Lead is not None,
         'whatsapp_api': whatsapp_api is not None,
         'db_type': str(type(db)) if db else None,
         'env_vars': {
-            'DATABASE_URL': os.getenv('DATABASE_URL', 'not set')[:20] + '...' if os.getenv('DATABASE_URL') else 'not set',
+            'DATABASE_URL': (os.getenv('DATABASE_URL', 'not set')[:20] + '...') if os.getenv('DATABASE_URL') else 'not set',
             'TWILIO_ACCOUNT_SID': 'set' if os.getenv('TWILIO_ACCOUNT_SID') else 'not set',
         }
     }), 200
 
-# Initialize on first non-health request
-@app.before_request
-def before_request():
-    if request.endpoint not in ['health', 'root']:
-        init_app()
 
 # ============================================================================
 # WEBHOOK VERIFICATION (GET request from Meta)
