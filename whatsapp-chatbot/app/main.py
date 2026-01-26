@@ -49,7 +49,7 @@ except Exception as e:
 
 # Initialize WhatsApp API
 print("🔄 Initializing WhatsApp API...")
-from app.utils.twilio_api import get_whatsapp_api
+from app.utils.twilio_api import get_whatsapp_api, TwilioWhatsAppAPI
 whatsapp_api = get_whatsapp_api()
 meta_api = whatsapp_api
 print(f"✅ WhatsApp API initialized")
