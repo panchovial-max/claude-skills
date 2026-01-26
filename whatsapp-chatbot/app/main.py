@@ -24,16 +24,28 @@ app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize database at module level
-print("🔄 Importing database models...")
-from app.models.database import db, Lead, Conversation
-print(f"✅ Models imported")
+db = None
+Lead = None
+Conversation = None
 
-db.init_app(app)
-print("✅ Database connected to app")
+try:
+    print("🔄 Importing database models...")
+    from app.models.database import db as _db, Lead as _Lead, Conversation as _Conversation
+    db = _db
+    Lead = _Lead
+    Conversation = _Conversation
+    print(f"✅ Models imported: db={db}, Lead={Lead}")
 
-with app.app_context():
-    db.create_all()
-    print("✅ Database tables created")
+    db.init_app(app)
+    print("✅ Database connected to app")
+
+    with app.app_context():
+        db.create_all()
+        print("✅ Database tables created")
+except Exception as e:
+    print(f"❌ DATABASE ERROR: {e}")
+    import traceback
+    traceback.print_exc()
 
 # Initialize WhatsApp API
 print("🔄 Initializing WhatsApp API...")
