@@ -13,7 +13,7 @@ print(f"Python version: {sys.version}")
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from datetime import datetime
-from app.flows.conversation_engine import PhotographyFlow, MarketingFlow
+# Conversation flows use inline messages now
 
 load_dotenv()
 
@@ -305,24 +305,48 @@ def process_conversation_step(lead: Lead, phone_number: str, user_input: str, cu
     if current_state == 'category_selection':
         if user_number == '1' or clean_input in ['1', 'fotografía', 'fotografia', 'foto', 'photography', 'fine art', 'video']:
             lead.service_category = 'photography'
-            flow = PhotographyFlow()
-            next_message = flow.MESSAGES['project_type']
-            whatsapp_api.send_text_message(phone_number, next_message['message'])
-            save_conversation(lead, next_message['message'], 'bot', 'photo_project_type', user_input)
+            msg = """¡Excelente elección! 📸
+
+¿Qué tipo de proyecto tienes en mente?
+
+1️⃣ Fotografía Ecuestre
+2️⃣ Fotografía Automotriz
+3️⃣ Video / Producción
+4️⃣ Otro tipo de proyecto
+
+Responde con el número:"""
+            whatsapp_api.send_text_message(phone_number, msg)
+            save_conversation(lead, msg, 'bot', 'photo_project_type', user_input)
 
         elif user_number == '2' or clean_input in ['2', 'producción', 'produccion', 'audiovisual', 'production']:
             lead.service_category = 'video_production'
-            flow = PhotographyFlow()
-            next_message = flow.MESSAGES['project_type']
-            whatsapp_api.send_text_message(phone_number, next_message['message'])
-            save_conversation(lead, next_message['message'], 'bot', 'photo_project_type', user_input)
+            msg = """¡Producción audiovisual! 🎬
+
+¿Qué tipo de producción necesitas?
+
+1️⃣ Video comercial
+2️⃣ Video corporativo
+3️⃣ Contenido para redes
+4️⃣ Documental / Cinematográfico
+
+Responde con el número:"""
+            whatsapp_api.send_text_message(phone_number, msg)
+            save_conversation(lead, msg, 'bot', 'photo_project_type', user_input)
 
         elif user_number == '3' or clean_input in ['3', 'marketing', 'ia', 'ai', 'digital']:
             lead.service_category = 'marketing'
-            flow = MarketingFlow()
-            next_message = flow.MESSAGES['problem']
-            whatsapp_api.send_text_message(phone_number, next_message['message'])
-            save_conversation(lead, next_message['message'], 'bot', 'marketing_problem', user_input)
+            msg = """¡Marketing con IA! 🤖
+
+¿Cuál es tu principal desafío de marketing?
+
+1️⃣ Necesito más clientes/leads
+2️⃣ Mejorar mis campañas actuales
+3️⃣ Crear contenido con IA
+4️⃣ Estrategia completa
+
+Responde con el número:"""
+            whatsapp_api.send_text_message(phone_number, msg)
+            save_conversation(lead, msg, 'bot', 'marketing_problem', user_input)
 
         else:
             whatsapp_api.send_text_message(phone_number, "Por favor, selecciona una opción válida (1, 2 o 3)")
@@ -330,25 +354,43 @@ def process_conversation_step(lead: Lead, phone_number: str, user_input: str, cu
     # Photography flow - project type
     elif current_state == 'photo_project_type':
         lead.sub_category = user_input
-        flow = PhotographyFlow()
-        next_message = flow.MESSAGES['gallery_or_brand']
-        whatsapp_api.send_text_message(phone_number, next_message['message'])
-        save_conversation(lead, next_message['message'], 'bot', 'photo_gallery_or_brand', user_input)
-    
+        msg = """¿Para qué será este proyecto?
+
+1️⃣ Galería personal / colección
+2️⃣ Marca o empresa
+3️⃣ Editorial / publicación
+4️⃣ Evento especial
+
+Responde con el número:"""
+        whatsapp_api.send_text_message(phone_number, msg)
+        save_conversation(lead, msg, 'bot', 'photo_gallery_or_brand', user_input)
+
     # Photography flow - gallery or brand
     elif current_state == 'photo_gallery_or_brand':
-        flow = PhotographyFlow()
-        next_message = flow.MESSAGES['timeline']
-        whatsapp_api.send_text_message(phone_number, next_message['message'])
-        save_conversation(lead, next_message['message'], 'bot', 'photo_timeline', user_input)
-    
+        msg = """¿Cuándo te gustaría realizar el proyecto?
+
+1️⃣ Lo antes posible (1-2 semanas)
+2️⃣ Este mes
+3️⃣ En los próximos 2-3 meses
+4️⃣ Aún no tengo fecha definida
+
+Responde con el número:"""
+        whatsapp_api.send_text_message(phone_number, msg)
+        save_conversation(lead, msg, 'bot', 'photo_timeline', user_input)
+
     # Photography flow - timeline
     elif current_state == 'photo_timeline':
-        flow = PhotographyFlow()
-        next_message = flow.MESSAGES['budget']
-        whatsapp_api.send_text_message(phone_number, next_message['message'])
-        save_conversation(lead, next_message['message'], 'bot', 'photo_budget', user_input)
-    
+        msg = """¿Cuál es tu presupuesto aproximado?
+
+1️⃣ $500 - $1,500 USD
+2️⃣ $1,500 - $3,000 USD
+3️⃣ $3,000 - $5,000 USD
+4️⃣ +$5,000 USD
+
+Responde con el número:"""
+        whatsapp_api.send_text_message(phone_number, msg)
+        save_conversation(lead, msg, 'bot', 'photo_budget', user_input)
+
     # Photography flow - budget (final qualification)
     elif current_state == 'photo_budget':
         lead.budget_range = user_input
@@ -357,25 +399,43 @@ def process_conversation_step(lead: Lead, phone_number: str, user_input: str, cu
     # Marketing flow - problem
     elif current_state == 'marketing_problem':
         lead.project_description = user_input
-        flow = MarketingFlow()
-        next_message = flow.MESSAGES['current_campaigns']
-        whatsapp_api.send_text_message(phone_number, next_message['message'])
-        save_conversation(lead, next_message['message'], 'bot', 'marketing_campaigns', user_input)
-    
+        msg = """¿Actualmente tienes campañas de marketing activas?
+
+1️⃣ Sí, en redes sociales
+2️⃣ Sí, en Google Ads
+3️⃣ Sí, ambas
+4️⃣ No tengo campañas activas
+
+Responde con el número:"""
+        whatsapp_api.send_text_message(phone_number, msg)
+        save_conversation(lead, msg, 'bot', 'marketing_campaigns', user_input)
+
     # Marketing flow - current campaigns
     elif current_state == 'marketing_campaigns':
-        flow = MarketingFlow()
-        next_message = flow.MESSAGES['current_spend']
-        whatsapp_api.send_text_message(phone_number, next_message['message'])
-        save_conversation(lead, next_message['message'], 'bot', 'marketing_spend', user_input)
-    
+        msg = """¿Cuánto inviertes actualmente en marketing digital?
+
+1️⃣ Menos de $500 USD/mes
+2️⃣ $500 - $2,000 USD/mes
+3️⃣ $2,000 - $5,000 USD/mes
+4️⃣ Más de $5,000 USD/mes
+
+Responde con el número:"""
+        whatsapp_api.send_text_message(phone_number, msg)
+        save_conversation(lead, msg, 'bot', 'marketing_spend', user_input)
+
     # Marketing flow - current spend
     elif current_state == 'marketing_spend':
-        flow = MarketingFlow()
         lead.budget_range = user_input
-        next_message = flow.MESSAGES['service_budget']
-        whatsapp_api.send_text_message(phone_number, next_message['message'])
-        save_conversation(lead, next_message['message'], 'bot', 'marketing_service_budget', user_input)
+        msg = """¿Cuál es tu presupuesto para nuestros servicios?
+
+1️⃣ $500 - $1,500 USD/mes
+2️⃣ $1,500 - $3,000 USD/mes
+3️⃣ $3,000 - $5,000 USD/mes
+4️⃣ +$5,000 USD/mes
+
+Responde con el número:"""
+        whatsapp_api.send_text_message(phone_number, msg)
+        save_conversation(lead, msg, 'bot', 'marketing_service_budget', user_input)
     
     # Marketing flow - service budget (final qualification)
     elif current_state == 'marketing_service_budget':
