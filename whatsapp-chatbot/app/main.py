@@ -171,28 +171,53 @@ def handle_twilio_message(sender_phone: str, user_input: str, profile_name: str 
     """
     from datetime import datetime, timezone
 
-    # Get or create lead
-    lead = Lead.query.filter_by(phone_number=sender_phone).first()
+    with app.app_context():
+        try:
+            # Get or create lead
+            lead = Lead.query.filter_by(phone_number=sender_phone).first()
 
-    if not lead:
-        lead = Lead(
-            phone_number=sender_phone,
-            name=profile_name,  # Twilio provides profile name
-            created_at=datetime.now(timezone.utc)
-        )
-        db.session.add(lead)
-        db.session.commit()
+            if not lead:
+                lead = Lead(
+                    phone_number=sender_phone,
+                    name=profile_name,
+                    created_at=datetime.now(timezone.utc)
+                )
+                db.session.add(lead)
+                db.session.commit()
+                print(f"✅ New lead created: {sender_phone}")
 
-        # Send greeting
-        send_greeting(lead, sender_phone)
-        return
+                # Send greeting
+                send_greeting(lead, sender_phone)
+                return
 
-    # Get current conversation state
-    last_message = Conversation.query.filter_by(lead_id=lead.id, sender='bot').order_by(Conversation.created_at.desc()).first()
-    current_state = last_message.flow_state if last_message else 'greeting'
+            # Get current conversation state
+            last_message = Conversation.query.filter_by(
+                lead_id=lead.id, sender='bot'
+            ).order_by(Conversation.created_at.desc()).first()
 
-    # Route based on current state
-    process_conversation_step(lead, sender_phone, user_input, current_state)
+            current_state = last_message.flow_state if last_message else None
+
+            # If no state or unknown state, re-send greeting
+            if not current_state or current_state in ('greeting', 'handoff_complete'):
+                print(f"🔄 Re-sending greeting to {sender_phone} (state: {current_state})")
+                send_greeting(lead, sender_phone)
+                return
+
+            # Route based on current state
+            process_conversation_step(lead, sender_phone, user_input, current_state)
+
+        except Exception as e:
+            print(f"❌ Error handling message from {sender_phone}: {e}")
+            import traceback
+            traceback.print_exc()
+            # Try to send a fallback message
+            try:
+                whatsapp_api.send_text_message(
+                    sender_phone,
+                    "Lo siento, hubo un error. Por favor intenta de nuevo escribiendo 'Hola'."
+                )
+            except Exception:
+                pass
 
 # ============================================================================
 # MESSAGE HANDLING (POST request from Meta)
@@ -465,7 +490,12 @@ Responde con el número:"""
     elif current_state == 'capture_company':
         lead.company = user_input
         send_confirmation_and_handoff(lead, phone_number)
-    
+
+    else:
+        # Unknown state - re-send greeting
+        print(f"⚠️ Unknown state '{current_state}' for {phone_number}, re-sending greeting")
+        send_greeting(lead, phone_number)
+
     db.session.commit()
 
 def capture_contact_info(lead: Lead, phone_number: str):
