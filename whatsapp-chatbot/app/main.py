@@ -13,6 +13,7 @@ print(f"Python version: {sys.version}")
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from datetime import datetime
+from app.flows.conversation_engine import PhotographyFlow, MarketingFlow
 
 load_dotenv()
 
@@ -57,6 +58,21 @@ print(f"✅ WhatsApp API initialized")
 def init_app():
     """Kept for compatibility - now a no-op since we initialize at module level"""
     pass
+
+# ============================================================================
+# DATA CAPTURE MESSAGES
+# ============================================================================
+
+class DataCapture:
+    """Messages for capturing lead contact information"""
+    MESSAGES = {
+        'name': "¿Cuál es tu nombre?",
+        'email': "¿Cuál es tu correo electrónico?",
+        'company': "¿Cuál es el nombre de tu empresa o proyecto?",
+        'confirmation': {
+            'message': "¡Perfecto! 🎉 Hemos registrado tu información. Un miembro de nuestro equipo te contactará pronto para discutir tu proyecto en detalle.\n\n¿Hay algo más en lo que pueda ayudarte?"
+        }
+    }
 
 # ============================================================================
 # HEALTH CHECK - Must be before other routes for Railway healthcheck
@@ -266,7 +282,7 @@ def send_greeting(lead: Lead, phone_number: str):
 
 Responde con el número de tu interés:"""
     
-    meta_api.send_text_message(phone_number, greeting)
+    whatsapp_api.send_text_message(phone_number, greeting)
     
     # Save bot message
     save_conversation(lead, greeting, 'bot', 'category_selection')
@@ -276,46 +292,61 @@ def process_conversation_step(lead: Lead, phone_number: str, user_input: str, cu
     Process conversation based on current state
     Routes to appropriate flow handler
     """
-    
+    # Clean user input - remove emojis and extra whitespace
+    import re
+    clean_input = re.sub(r'[^\w\s]', '', user_input).strip().lower()
+    # Also extract just the number if present
+    number_match = re.search(r'\d+', user_input)
+    user_number = number_match.group() if number_match else None
+
+    print(f"🔍 Processing: input='{user_input}', clean='{clean_input}', number='{user_number}', state='{current_state}'")
+
     # Category selection
     if current_state == 'category_selection':
-        if user_input in ['1', 'Fotografía', 'Photography', 'Fine Art', 'Video']:
+        if user_number == '1' or clean_input in ['1', 'fotografía', 'fotografia', 'foto', 'photography', 'fine art', 'video']:
             lead.service_category = 'photography'
             flow = PhotographyFlow()
             next_message = flow.MESSAGES['project_type']
-            meta_api.send_text_message(phone_number, next_message['message'])
+            whatsapp_api.send_text_message(phone_number, next_message['message'])
             save_conversation(lead, next_message['message'], 'bot', 'photo_project_type', user_input)
-        
-        elif user_input in ['3', 'Marketing', 'IA', 'AI']:
+
+        elif user_number == '2' or clean_input in ['2', 'producción', 'produccion', 'audiovisual', 'production']:
+            lead.service_category = 'video_production'
+            flow = PhotographyFlow()
+            next_message = flow.MESSAGES['project_type']
+            whatsapp_api.send_text_message(phone_number, next_message['message'])
+            save_conversation(lead, next_message['message'], 'bot', 'photo_project_type', user_input)
+
+        elif user_number == '3' or clean_input in ['3', 'marketing', 'ia', 'ai', 'digital']:
             lead.service_category = 'marketing'
             flow = MarketingFlow()
             next_message = flow.MESSAGES['problem']
-            meta_api.send_text_message(phone_number, next_message['message'])
+            whatsapp_api.send_text_message(phone_number, next_message['message'])
             save_conversation(lead, next_message['message'], 'bot', 'marketing_problem', user_input)
-        
+
         else:
-            meta_api.send_text_message(phone_number, "Por favor, selecciona una opción válida (1, 2 o 3)")
+            whatsapp_api.send_text_message(phone_number, "Por favor, selecciona una opción válida (1, 2 o 3)")
     
     # Photography flow - project type
     elif current_state == 'photo_project_type':
         lead.sub_category = user_input
         flow = PhotographyFlow()
         next_message = flow.MESSAGES['gallery_or_brand']
-        meta_api.send_text_message(phone_number, next_message['message'])
+        whatsapp_api.send_text_message(phone_number, next_message['message'])
         save_conversation(lead, next_message['message'], 'bot', 'photo_gallery_or_brand', user_input)
     
     # Photography flow - gallery or brand
     elif current_state == 'photo_gallery_or_brand':
         flow = PhotographyFlow()
         next_message = flow.MESSAGES['timeline']
-        meta_api.send_text_message(phone_number, next_message['message'])
+        whatsapp_api.send_text_message(phone_number, next_message['message'])
         save_conversation(lead, next_message['message'], 'bot', 'photo_timeline', user_input)
     
     # Photography flow - timeline
     elif current_state == 'photo_timeline':
         flow = PhotographyFlow()
         next_message = flow.MESSAGES['budget']
-        meta_api.send_text_message(phone_number, next_message['message'])
+        whatsapp_api.send_text_message(phone_number, next_message['message'])
         save_conversation(lead, next_message['message'], 'bot', 'photo_budget', user_input)
     
     # Photography flow - budget (final qualification)
@@ -328,14 +359,14 @@ def process_conversation_step(lead: Lead, phone_number: str, user_input: str, cu
         lead.project_description = user_input
         flow = MarketingFlow()
         next_message = flow.MESSAGES['current_campaigns']
-        meta_api.send_text_message(phone_number, next_message['message'])
+        whatsapp_api.send_text_message(phone_number, next_message['message'])
         save_conversation(lead, next_message['message'], 'bot', 'marketing_campaigns', user_input)
     
     # Marketing flow - current campaigns
     elif current_state == 'marketing_campaigns':
         flow = MarketingFlow()
         next_message = flow.MESSAGES['current_spend']
-        meta_api.send_text_message(phone_number, next_message['message'])
+        whatsapp_api.send_text_message(phone_number, next_message['message'])
         save_conversation(lead, next_message['message'], 'bot', 'marketing_spend', user_input)
     
     # Marketing flow - current spend
@@ -343,7 +374,7 @@ def process_conversation_step(lead: Lead, phone_number: str, user_input: str, cu
         flow = MarketingFlow()
         lead.budget_range = user_input
         next_message = flow.MESSAGES['service_budget']
-        meta_api.send_text_message(phone_number, next_message['message'])
+        whatsapp_api.send_text_message(phone_number, next_message['message'])
         save_conversation(lead, next_message['message'], 'bot', 'marketing_service_budget', user_input)
     
     # Marketing flow - service budget (final qualification)
@@ -357,12 +388,12 @@ def process_conversation_step(lead: Lead, phone_number: str, user_input: str, cu
     # Contact info capture
     elif current_state == 'capture_name':
         lead.name = user_input
-        meta_api.send_text_message(phone_number, DataCapture.MESSAGES['email'])
+        whatsapp_api.send_text_message(phone_number, DataCapture.MESSAGES['email'])
         save_conversation(lead, DataCapture.MESSAGES['email'], 'bot', 'capture_email', user_input)
     
     elif current_state == 'capture_email':
         lead.email = user_input
-        meta_api.send_text_message(phone_number, DataCapture.MESSAGES['company'])
+        whatsapp_api.send_text_message(phone_number, DataCapture.MESSAGES['company'])
         save_conversation(lead, DataCapture.MESSAGES['company'], 'bot', 'capture_company', user_input)
     
     elif current_state == 'capture_company':
@@ -373,7 +404,7 @@ def process_conversation_step(lead: Lead, phone_number: str, user_input: str, cu
 
 def capture_contact_info(lead: Lead, phone_number: str):
     """Start contact information capture"""
-    meta_api.send_text_message(phone_number, DataCapture.MESSAGES['name'])
+    whatsapp_api.send_text_message(phone_number, DataCapture.MESSAGES['name'])
     save_conversation(lead, DataCapture.MESSAGES['name'], 'bot', 'capture_name')
 
 def send_confirmation_and_handoff(lead: Lead, phone_number: str):
@@ -385,7 +416,7 @@ def send_confirmation_and_handoff(lead: Lead, phone_number: str):
     
     # Send confirmation to user
     confirmation_msg = DataCapture.MESSAGES['confirmation']['message']
-    meta_api.send_text_message(phone_number, confirmation_msg)
+    whatsapp_api.send_text_message(phone_number, confirmation_msg)
     save_conversation(lead, confirmation_msg, 'bot', 'handoff_complete')
     
     # Send notification to Pancho via n8n
