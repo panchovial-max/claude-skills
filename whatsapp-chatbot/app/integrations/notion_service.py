@@ -4,6 +4,7 @@ Handles two-way sync between leads database and Notion
 """
 
 import os
+import httpx
 from datetime import datetime
 from typing import Optional
 from notion_client import Client
@@ -92,19 +93,29 @@ class NotionService:
             return None
 
         try:
-            response = self.client.databases.query(
-                database_id=self.leads_db_id,
-                filter={
-                    "property": "Phone",
-                    "phone_number": {
-                        "equals": phone_number
+            # Use direct HTTP request since notion-client v2.7 doesn't have databases.query
+            response = httpx.post(
+                f'https://api.notion.com/v1/databases/{self.leads_db_id}/query',
+                headers={
+                    'Authorization': f'Bearer {self.api_key}',
+                    'Notion-Version': '2022-06-28',
+                    'Content-Type': 'application/json'
+                },
+                json={
+                    "filter": {
+                        "property": "Phone",
+                        "phone_number": {
+                            "equals": phone_number
+                        }
                     }
-                }
+                },
+                timeout=10.0
             )
 
-            results = response.get('results', [])
-            if results:
-                return results[0]['id']
+            if response.status_code == 200:
+                results = response.json().get('results', [])
+                if results:
+                    return results[0]['id']
             return None
 
         except Exception as e:
@@ -168,11 +179,12 @@ class NotionService:
                 'select': {'name': quality}
             }
 
-        # Status (Status)
-        if lead_data.get('status'):
-            properties['Status'] = {
-                'status': {'name': lead_data['status'].capitalize()}
-            }
+        # Status (Select - since Status type requires special setup)
+        # Skip status for now as it's not configured in the database
+        # if lead_data.get('status'):
+        #     properties['Status'] = {
+        #         'select': {'name': lead_data['status'].capitalize()}
+        #     }
 
         # Campaign Source (Select)
         if lead_data.get('campaign_source'):
@@ -211,42 +223,52 @@ class NotionService:
         Fetch upcoming scheduled posts from Notion content calendar.
         Returns list of posts scheduled for the next N days.
         """
-        if not self.client or not self.content_db_id:
+        if not self.api_key or not self.content_db_id:
             print("Content calendar not configured")
             return []
 
         try:
             today = datetime.utcnow().date().isoformat()
 
-            response = self.client.databases.query(
-                database_id=self.content_db_id,
-                filter={
-                    "and": [
-                        {
-                            "property": "Date",
-                            "date": {
-                                "on_or_after": today
+            # Use direct HTTP request since notion-client v2.7 moved query method
+            response = httpx.post(
+                f'https://api.notion.com/v1/databases/{self.content_db_id}/query',
+                headers={
+                    'Authorization': f'Bearer {self.api_key}',
+                    'Notion-Version': '2022-06-28',
+                    'Content-Type': 'application/json'
+                },
+                json={
+                    "filter": {
+                        "and": [
+                            {
+                                "property": "Publish Date",
+                                "date": {
+                                    "on_or_after": today
+                                }
+                            },
+                            {
+                                "property": "Status",
+                                "select": {
+                                    "equals": "Scheduled"
+                                }
                             }
-                        },
+                        ]
+                    },
+                    "sorts": [
                         {
-                            "property": "Status",
-                            "status": {
-                                "equals": "Scheduled"
-                            }
+                            "property": "Publish Date",
+                            "direction": "ascending"
                         }
                     ]
                 },
-                sorts=[
-                    {
-                        "property": "Date",
-                        "direction": "ascending"
-                    }
-                ]
+                timeout=10.0
             )
 
             posts = []
-            for page in response.get('results', []):
-                posts.append(self._parse_content_page(page))
+            if response.status_code == 200:
+                for page in response.json().get('results', []):
+                    posts.append(self._parse_content_page(page))
 
             return posts
 
@@ -272,11 +294,15 @@ class NotionService:
 
         return {
             'id': page['id'],
-            'title': self._get_title(props.get('Title', {})),
-            'date': self._get_date(props.get('Date', {})),
+            # Support both naming conventions
+            'title': self._get_title(props.get('Content Title', props.get('Title', {}))),
+            'date': self._get_date(props.get('Publish Date', props.get('Date', {}))),
             'type': self._get_select(props.get('Type', {})),
-            'status': self._get_status(props.get('Status', {})),
-            'platform': self._get_multi_select(props.get('Platform', {})),
+            'status': self._get_select(props.get('Status', {})),  # Changed from _get_status
+            'platform': self._get_multi_select(props.get('Channel', props.get('Platform', {}))),
+            'funnel_stage': self._get_select(props.get('Funnel Stage', {})),
+            'topic_cluster': self._get_select(props.get('Topic Cluster', {})),
+            'target_keyword': self._get_rich_text(props.get('Target Keyword', {})),
             'campaign': self._get_rich_text(props.get('Campaign', {})),
             'cta_link': self._get_url(props.get('CTA Link', {})),
             'caption': self._get_rich_text(props.get('Caption', {}))

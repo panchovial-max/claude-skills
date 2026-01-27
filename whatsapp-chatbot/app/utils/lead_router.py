@@ -186,7 +186,7 @@ class LeadRouter:
         """
         Send notification to admin (Pancho) about new qualified lead
         Uses n8n webhook to trigger automated workflows
-        Also syncs lead to Notion if configured
+        Also syncs lead to Notion if not already synced
         """
         n8n_webhook = os.getenv('N8N_WEBHOOK_URL')
 
@@ -194,10 +194,12 @@ class LeadRouter:
         lead_quality = LeadRouter.determine_lead_quality(lead_data)
         recommended_service = LeadRouter.determine_recommended_service(lead_data)
 
-        # Sync to Notion
-        notion_page_id = LeadRouter.sync_to_notion(lead_data)
-        if notion_page_id:
-            lead_data['notion_page_id'] = notion_page_id
+        # Sync to Notion only if not already synced
+        notion_page_id = lead_data.get('notion_page_id')
+        if not notion_page_id:
+            notion_page_id = LeadRouter.sync_to_notion(lead_data)
+            if notion_page_id:
+                lead_data['notion_page_id'] = notion_page_id
 
         if not n8n_webhook:
             print("⚠️ N8N_WEBHOOK_URL not configured")

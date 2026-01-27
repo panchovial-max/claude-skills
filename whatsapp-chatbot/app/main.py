@@ -13,7 +13,13 @@ print(f"Python version: {sys.version}")
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from datetime import datetime
-# Conversation flows use inline messages now
+
+# Import lead router and Notion service
+from app.utils.lead_router import LeadRouter
+from app.integrations.notion_service import NotionService
+
+# Initialize services
+notion_service = NotionService()
 
 load_dotenv()
 
@@ -473,16 +479,29 @@ def send_confirmation_and_handoff(lead: Lead, phone_number: str):
     lead.lead_quality = LeadRouter.determine_lead_quality(lead.to_dict())
     lead.status = 'qualified'
     db.session.commit()
-    
+
     # Send confirmation to user
     confirmation_msg = DataCapture.MESSAGES['confirmation']['message']
     whatsapp_api.send_text_message(phone_number, confirmation_msg)
     save_conversation(lead, confirmation_msg, 'bot', 'handoff_complete')
-    
-    # Send notification to Pancho via n8n
-    brief = LeadRouter.format_lead_brief(lead.to_dict())
-    LeadRouter.send_admin_notification(lead.to_dict(), 'new_lead_qualified')
-    
+
+    # Sync lead to Notion (do this BEFORE sending notification)
+    try:
+        lead_data = lead.to_dict()
+        notion_page_id = notion_service.sync_lead(lead_data)
+        if notion_page_id:
+            lead.notion_page_id = notion_page_id
+            lead_data['notion_page_id'] = notion_page_id  # Update dict for notification
+            db.session.commit()
+            print(f"✅ Lead synced to Notion: {notion_page_id}")
+    except Exception as e:
+        print(f"⚠️ Error syncing to Notion: {e}")
+        lead_data = lead.to_dict()  # Refresh data
+
+    # Send notification to Pancho via n8n (skip Notion sync since we already did it)
+    brief = LeadRouter.format_lead_brief(lead_data)
+    LeadRouter.send_admin_notification(lead_data, 'new_lead_qualified')
+
     print(brief)
 
 def save_conversation(lead: Lead, message_text: str, sender: str, flow_state: str, user_response: str = None):
