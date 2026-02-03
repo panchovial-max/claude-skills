@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conectar Cuentas - PVB Client Portal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            color: #2d3748;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #718096;
+            font-size: 16px;
+        }
+
+        .platform-card {
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 16px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .platform-card:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        }
+
+        .platform-card.connected {
+            background: #f0fff4;
+            border-color: #48bb78;
+        }
+
+        .platform-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .platform-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .platform-icon {
+            font-size: 40px;
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .platform-details h3 {
+            color: #2d3748;
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+
+        .platform-details p {
+            color: #718096;
+            font-size: 14px;
+        }
+
+        .connect-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .connect-btn:hover {
+            background: #5a67d8;
+            transform: scale(1.05);
+        }
+
+        .connect-btn.connected {
+            background: #48bb78;
+            cursor: default;
+        }
+
+        .connect-btn.connected:hover {
+            background: #48bb78;
+            transform: none;
+        }
+
+        .status-badge {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: #48bb78;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            display: none;
+        }
+
+        .platform-card.connected .status-badge {
+            display: block;
+        }
+
+        .metrics-preview {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #e2e8f0;
+            display: none;
+        }
+
+        .platform-card.connected .metrics-preview {
+            display: block;
+        }
+
+        .metrics-preview p {
+            color: #4a5568;
+            font-size: 13px;
+        }
+
+        .back-link {
+            text-align: center;
+            margin-top: 24px;
+        }
+
+        .back-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .back-link a:hover {
+            text-decoration: underline;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔗 Conecta tus Plataformas</h1>
+            <p>Conecta tus cuentas publicitarias en 1 click</p>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Cargando conexiones...</p>
+        </div>
+
+        <div id="platforms-container">
+            <!-- Google Ads -->
+            <div class="platform-card" id="google-ads-card" data-platform="google-ads">
+                <span class="status-badge">✓ Conectado</span>
+                <div class="platform-header">
+                    <div class="platform-info">
+                        <div class="platform-icon">🔴</div>
+                        <div class="platform-details">
+                            <h3>Google Ads</h3>
+                            <p>Campañas de búsqueda y display</p>
+                        </div>
+                    </div>
+                </div>
+                <button class="connect-btn" onclick="connectPlatform('google-ads')">
+                    Conectar Ahora
+                </button>
+                <div class="metrics-preview">
+                    <p>📊 Última sincronización: hace 2 horas</p>
+                </div>
+            </div>
+
+            <!-- Meta (Facebook + Instagram) -->
+            <div class="platform-card" id="meta-card" data-platform="meta">
+                <span class="status-badge">✓ Conectado</span>
+                <div class="platform-header">
+                    <div class="platform-info">
+                        <div class="platform-icon">🔵</div>
+                        <div class="platform-details">
+                            <h3>Facebook & Instagram</h3>
+                            <p>Ads en redes sociales de Meta</p>
+                        </div>
+                    </div>
+                </div>
+                <button class="connect-btn" onclick="connectPlatform('meta')">
+                    Conectar Ahora
+                </button>
+                <div class="metrics-preview">
+                    <p>📊 Última sincronización: hace 1 hora</p>
+                </div>
+            </div>
+
+            <!-- LinkedIn -->
+            <div class="platform-card" id="linkedin-card" data-platform="linkedin">
+                <span class="status-badge">✓ Conectado</span>
+                <div class="platform-header">
+                    <div class="platform-info">
+                        <div class="platform-icon">💼</div>
+                        <div class="platform-details">
+                            <h3>LinkedIn Ads</h3>
+                            <p>Marketing B2B profesional</p>
+                        </div>
+                    </div>
+                </div>
+                <button class="connect-btn" onclick="connectPlatform('linkedin')">
+                    Conectar Ahora
+                </button>
+                <div class="metrics-preview">
+                    <p>📊 Última sincronización: hace 3 horas</p>
+                </div>
+            </div>
+
+            <!-- TikTok -->
+            <div class="platform-card" id="tiktok-card" data-platform="tiktok">
+                <span class="status-badge">✓ Conectado</span>
+                <div class="platform-header">
+                    <div class="platform-info">
+                        <div class="platform-icon">🎵</div>
+                        <div class="platform-details">
+                            <h3>TikTok Ads</h3>
+                            <p>Videos virales y audiencia joven</p>
+                        </div>
+                    </div>
+                </div>
+                <button class="connect-btn" onclick="connectPlatform('tiktok')">
+                    Conectar Ahora
+                </button>
+                <div class="metrics-preview">
+                    <p>📊 Última sincronización: hace 30 minutos</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="back-link">
+            <a href="dashboard.html">← Volver al Dashboard</a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // Configuración de Supabase
+        const SUPABASE_URL = 'https://htkzpktnaladabovakwc.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a3pwa3RuYWxhZGFib3Zha3djIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc2MjI2ODYsImV4cCI6MjA1MzE5ODY4Nn0.wjJH0VGD9xEPwD2FEQwDxQDxQDxQDxQDxQDxQDxQDxQ';
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Obtener sesión del usuario
+        let currentUser = null;
+        let sessionToken = null;
+
+        async function initPage() {
+            // Mostrar loading
+            document.getElementById('loading').classList.add('active');
+
+            // Verificar sesión
+            const { data: { session }, error } = await supabase.auth.getSession();
+
+            if (error || !session) {
+                alert('Debes iniciar sesión primero');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            currentUser = session.user;
+            sessionToken = session.access_token;
+
+            // Cargar estado de conexiones
+            await loadConnectionStatus();
+
+            // Ocultar loading
+            document.getElementById('loading').classList.remove('active');
+        }
+
+        async function loadConnectionStatus() {
+            try {
+                const response = await fetch('/.netlify/functions/accounts-status', {
+                    headers: {
+                        'Authorization': `Bearer ${sessionToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    console.error('Error loading connection status');
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (data.success && data.accounts) {
+                    // Actualizar UI con estado de cada plataforma
+                    updatePlatformStatus('google-ads', data.accounts.google_ads);
+                    updatePlatformStatus('meta', data.accounts.meta);
+                    updatePlatformStatus('linkedin', data.accounts.linkedin);
+                    updatePlatformStatus('tiktok', data.accounts.tiktok);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        function updatePlatformStatus(platform, isConnected) {
+            const card = document.getElementById(`${platform}-card`);
+            const btn = card.querySelector('.connect-btn');
+
+            if (isConnected) {
+                card.classList.add('connected');
+                btn.textContent = '✓ Conectado';
+                btn.classList.add('connected');
+                btn.onclick = null;
+            } else {
+                card.classList.remove('connected');
+                btn.textContent = 'Conectar Ahora';
+                btn.classList.remove('connected');
+            }
+        }
+
+        async function connectPlatform(platform) {
+            try {
+                // Llamar al endpoint de OAuth initiate
+                const response = await fetch(`/.netlify/functions/oauth-${platform}-initiate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${sessionToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.authorization_url) {
+                    // Redirigir a la página de autorización de la plataforma
+                    window.location.href = data.authorization_url;
+                } else {
+                    alert('Error al iniciar conexión: ' + (data.message || 'Error desconocido'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al conectar con la plataforma');
+            }
+        }
+
+        // Inicializar página al cargar
+        window.addEventListener('DOMContentLoaded', initPage);
+    </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "name": "pvb-client-portal",
+  "version": "1.0.0",
+  "description": "PVB Client Portal - Marketing metrics dashboard with OAuth integration",
+  "type": "module",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "netlify build",
+    "deploy": "netlify deploy --prod"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
