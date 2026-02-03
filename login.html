@@ -223,11 +223,6 @@
                 <span class="icon">🔴</span>
                 <span>Continuar con Google</span>
             </button>
-
-            <button class="social-btn facebook-btn" id="facebook-login">
-                <span class="icon">🔵</span>
-                <span>Continuar con Facebook</span>
-            </button>
         </div>
 
         <div class="divider">
@@ -285,7 +280,6 @@
         const errorMessage = document.getElementById('error-message');
         const successMessage = document.getElementById('success-message');
         const googleLoginBtn = document.getElementById('google-login');
-        const facebookLoginBtn = document.getElementById('facebook-login');
 
         let isLoginMode = true;
 
@@ -322,22 +316,6 @@
                 if (error) throw error;
             } catch (error) {
                 showError('Error al iniciar sesión con Google: ' + error.message);
-            }
-        });
-
-        // Facebook Login
-        facebookLoginBtn.addEventListener('click', async () => {
-            try {
-                const { data, error } = await supabase.auth.signInWithOAuth({
-                    provider: 'facebook',
-                    options: {
-                        redirectTo: `${window.location.origin}/dashboard.html`
-                    }
-                });
-
-                if (error) throw error;
-            } catch (error) {
-                showError('Error al iniciar sesión con Facebook: ' + error.message);
             }
         });
 
