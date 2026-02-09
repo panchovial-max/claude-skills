@@ -50,7 +50,8 @@ export const handler = async (event, context) => {
       'google-ads': false,
       'meta': false,
       'linkedin': false,
-      'tiktok': false
+      'tiktok': false,
+      'notion': false
     };
 
     const accountDetails = {};
@@ -90,6 +91,14 @@ export const handler = async (event, context) => {
         } else if (platformKey === 'tiktok') {
           status['tiktok'] = true;
           accountDetails['tiktok'] = {
+            id: account.account_id,
+            name: account.account_name,
+            connected_at: account.connected_at,
+            last_sync: account.last_sync_at
+          };
+        } else if (platformKey === 'notion') {
+          status['notion'] = true;
+          accountDetails['notion'] = {
             id: account.account_id,
             name: account.account_name,
             connected_at: account.connected_at,

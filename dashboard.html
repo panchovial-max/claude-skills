@@ -216,6 +216,15 @@
                 <div class="card-value">-</div>
                 <div class="card-label">No conectado</div>
             </div>
+
+            <div class="card" id="notion-card">
+                <div class="card-header">
+                    <span class="card-icon">📝</span>
+                    <span class="card-title">Notion</span>
+                </div>
+                <div class="card-value" id="notion-value">-</div>
+                <div class="card-label" id="notion-label">No conectado</div>
+            </div>
         </div>
 
         <div class="card cta-card">
@@ -224,6 +233,33 @@
             <button class="cta-btn" onclick="window.location.href='connect-accounts.html'">
                 Conectar Ahora
             </button>
+        </div>
+
+        <div class="card cta-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <h3>📅 Ver Calendario</h3>
+            <p>Revisa tu calendario de contenido y próximas publicaciones</p>
+            <button class="cta-btn" onclick="window.location.href='calendar.html'">
+                Ir al Calendario
+            </button>
+        </div>
+
+        <!-- Google Calendar Subscription Card -->
+        <div class="card" id="gcal-card" style="border: 2px solid #4285f4; display: none;">
+            <div style="text-align: center;">
+                <h3 style="color: #4285f4; margin-bottom: 12px;">📆 Google Calendar</h3>
+                <p id="gcal-status" style="color: #718096; margin-bottom: 16px;">
+                    Crea tu calendario personal
+                </p>
+                <button class="cta-btn" id="create-gcal-btn" onclick="createGoogleCalendar()" style="background: #4285f4;">
+                    Crear Calendario
+                </button>
+                <div id="gcal-link" style="display: none; margin-top: 16px;">
+                    <p style="color: #48bb78; font-weight: 600; margin-bottom: 8px;">✅ Calendario creado</p>
+                    <a id="gcal-subscribe-link" href="#" target="_blank" style="color: #4285f4; text-decoration: none; font-weight: 600;">
+                        📲 Agregar a mi Google Calendar →
+                    </a>
+                </div>
+            </div>
         </div>
 
         <div class="info-text">
@@ -267,12 +303,83 @@
 
                 if (response.ok) {
                     const data = await response.json();
+
+                    // Update Notion card
+                    if (data.accounts?.notion) {
+                        document.getElementById('notion-value').textContent = '✓';
+                        document.getElementById('notion-label').textContent = 'Conectado';
+                        document.getElementById('notion-value').style.color = '#48bb78';
+                    }
+
                     // Update cards based on connection status
                     // This will be implemented when we have the backend ready
                     console.log('Platform status:', data);
                 }
             } catch (error) {
                 console.error('Error loading platform status:', error);
+            }
+        }
+
+        // Crear Google Calendar
+        async function createGoogleCalendar() {
+            const btn = document.getElementById('create-gcal-btn');
+            btn.disabled = true;
+            btn.textContent = 'Creando...';
+
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+
+                const response = await fetch('/.netlify/functions/google-calendar-create', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${session.access_token}`
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Mostrar link de suscripción
+                    document.getElementById('gcal-link').style.display = 'block';
+                    document.getElementById('gcal-subscribe-link').href = result.subscription_link;
+                    btn.style.display = 'none';
+                    document.getElementById('gcal-status').textContent = 'Agrega este calendario a tu Google Calendar para recibir notificaciones';
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                alert('Error al crear calendario: ' + error.message);
+                btn.disabled = false;
+                btn.textContent = 'Crear Calendario';
+            }
+        }
+
+        // Verificar si ya tiene calendario creado
+        async function checkGoogleCalendar() {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) return;
+
+                // Verificar en Supabase si ya tiene calendario
+                const { data, error } = await supabase
+                    .from('google_calendar_connections')
+                    .select('*')
+                    .eq('user_id', session.user.id)
+                    .single();
+
+                if (data) {
+                    // Ya tiene calendario
+                    document.getElementById('gcal-card').style.display = 'block';
+                    document.getElementById('gcal-link').style.display = 'block';
+                    document.getElementById('create-gcal-btn').style.display = 'none';
+                    document.getElementById('gcal-subscribe-link').href = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(data.calendar_id)}`;
+                    document.getElementById('gcal-status').textContent = 'Agrega este calendario a tu Google Calendar';
+                } else {
+                    // No tiene calendario, mostrar botón de crear
+                    document.getElementById('gcal-card').style.display = 'block';
+                }
+            } catch (error) {
+                console.log('No Google Calendar yet');
             }
         }
 
@@ -283,7 +390,11 @@
         });
 
         // Initialize
-        checkAuth();
+        async function init() {
+            await checkAuth();
+            await checkGoogleCalendar();
+        }
+        init();
     </script>
 </body>
 </html>
