@@ -487,6 +487,9 @@
 
             // 3. Inicializar calendario
             initCalendar();
+
+            // 4. Registrar event listeners
+            setupEventListeners();
         }
 
         async function checkGoogleCalendar() {
@@ -685,22 +688,28 @@
             }
         }
 
-        // Event listeners
-        document.getElementById('sync-btn')?.addEventListener('click', syncCalendar);
-        document.querySelector('.close')?.addEventListener('click', () => {
-            document.getElementById('event-modal').style.display = 'none';
-        });
+        // Configurar event listeners
+        function setupEventListeners() {
+            // Sync button
+            document.getElementById('sync-btn')?.addEventListener('click', syncCalendar);
 
-        document.getElementById('logout-btn')?.addEventListener('click', async () => {
-            await supabase.auth.signOut();
-            window.location.href = 'login.html';
-        });
+            // Modal close button
+            document.querySelector('.close')?.addEventListener('click', () => {
+                document.getElementById('event-modal').style.display = 'none';
+            });
 
-        // Cerrar modal al hacer click fuera
-        window.onclick = function(event) {
-            const modal = document.getElementById('event-modal');
-            if (event.target == modal) {
-                modal.style.display = 'none';
+            // Logout button
+            document.getElementById('logout-btn')?.addEventListener('click', async () => {
+                await supabase.auth.signOut();
+                window.location.href = 'login.html';
+            });
+
+            // Cerrar modal al hacer click fuera
+            window.onclick = function(event) {
+                const modal = document.getElementById('event-modal');
+                if (event.target == modal) {
+                    modal.style.display = 'none';
+                }
             }
         }
 

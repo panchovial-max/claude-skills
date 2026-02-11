@@ -367,16 +367,20 @@
             }
         }
 
-        // Logout
-        document.getElementById('logout-btn')?.addEventListener('click', async () => {
-            await supabase.auth.signOut();
-            window.location.href = 'login.html';
-        });
+        // Configurar event listeners
+        function setupEventListeners() {
+            // Logout button
+            document.getElementById('logout-btn')?.addEventListener('click', async () => {
+                await supabase.auth.signOut();
+                window.location.href = 'login.html';
+            });
+        }
 
         // Initialize
         async function init() {
             await checkAuth();
             await checkGoogleCalendar();
+            setupEventListeners();
         }
         init();
     </script>
