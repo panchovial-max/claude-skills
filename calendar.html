@@ -461,7 +461,6 @@
 
         let calendar;
         let sessionToken;
-        let selectedDatabaseId = null;
 
         // Inicialización
         async function init() {
@@ -479,33 +478,25 @@
             const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario';
             document.getElementById('user-name').textContent = userName;
 
-            // 2. Verificar que Notion esté conectado
-            const notionConnected = await checkNotionConnection();
-            if (!notionConnected) {
-                showNotionSetup();
+            // 2. Verificar que el calendario de Google esté creado
+            const hasCalendar = await checkGoogleCalendar();
+            if (!hasCalendar) {
+                showCalendarSetup();
                 return;
             }
 
-            // 3. Obtener la base de datos configurada o solicitar configuración
-            selectedDatabaseId = localStorage.getItem('notion_database_id');
-            if (!selectedDatabaseId) {
-                await showDatabaseSelector();
-                return;
-            }
-
-            // 4. Inicializar calendario
+            // 3. Inicializar calendario
             initCalendar();
         }
 
-        async function checkNotionConnection() {
+        async function checkGoogleCalendar() {
             try {
-                const response = await fetch('/.netlify/functions/accounts-status', {
+                const response = await fetch('/.netlify/functions/calendar-events?start_date=2024-01-01&end_date=2024-01-02', {
                     headers: { 'Authorization': `Bearer ${sessionToken}` }
                 });
-                const data = await response.json();
-                return data.accounts?.notion === true;
+                return response.ok;
             } catch (error) {
-                console.error('Error checking Notion connection:', error);
+                console.error('Error checking calendar:', error);
                 return false;
             }
         }
@@ -565,28 +556,24 @@
             return await response.json();
         }
 
-        async function syncNotionEvents() {
+        async function syncCalendar() {
             const btn = document.getElementById('sync-btn');
             btn.disabled = true;
             btn.textContent = '⏳ Sincronizando...';
 
             try {
-                const response = await fetch('/.netlify/functions/notion-calendar-sync', {
+                const response = await fetch('/.netlify/functions/notion-to-gcal-sync', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${sessionToken}`,
                         'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        database_id: selectedDatabaseId,
-                        days_ahead: 60
-                    })
+                    }
                 });
 
                 const result = await response.json();
 
                 if (result.success) {
-                    alert(`✅ ${result.synced} eventos sincronizados exitosamente`);
+                    alert(`✅ ${result.synced} eventos sincronizados a tu Google Calendar`);
 
                     // Refrescar calendario
                     if (calendar) {
@@ -631,7 +618,6 @@
                 ${props.topic_cluster ? `<p><strong>🏷️ Tema:</strong> ${props.topic_cluster}</p>` : ''}
                 ${props.caption ? `<p><strong>✍️ Caption:</strong><br>${props.caption.substring(0, 200)}${props.caption.length > 200 ? '...' : ''}</p>` : ''}
                 ${props.cta_link ? `<p><strong>🔗 Link:</strong> <a href="${props.cta_link}" target="_blank">${props.cta_link}</a></p>` : ''}
-                ${props.notionUrl ? `<p><a href="${props.notionUrl}" target="_blank" class="btn-secondary" style="display:inline-block; margin-top:16px; text-decoration:none;">Ver en Notion →</a></p>` : ''}
             `;
 
             // Agregar sección de comentarios
@@ -662,100 +648,45 @@
             modal.style.display = 'block';
         }
 
-        function showNotionSetup() {
+        function showCalendarSetup() {
             document.getElementById('calendar').innerHTML = `
                 <div class="setup-message">
-                    <h2>📝 Conecta tu Notion</h2>
-                    <p>Para ver tu calendario, primero debes conectar tu cuenta de Notion</p>
-                    <button onclick="connectNotion()" class="btn-primary" style="padding: 12px 32px; font-size: 16px;">Conectar Notion</button>
+                    <h2>📅 Configura tu Calendario</h2>
+                    <p>Para ver tu calendario de marketing, primero necesitas crear tu Google Calendar personalizado</p>
+                    <button onclick="createCalendar()" class="btn-primary" style="padding: 12px 32px; font-size: 16px;">Crear Calendario PVB Marketing</button>
                 </div>
             `;
             document.getElementById('sync-btn').style.display = 'none';
         }
 
-        async function showDatabaseSelector() {
+        async function createCalendar() {
             try {
-                const response = await fetch('/.netlify/functions/notion-databases-list', {
-                    headers: { 'Authorization': `Bearer ${sessionToken}` }
-                });
+                const btn = event.target;
+                btn.disabled = true;
+                btn.textContent = 'Creando...';
 
-                const data = await response.json();
-
-                if (!data.success || data.databases.length === 0) {
-                    document.getElementById('calendar').innerHTML = `
-                        <div class="setup-message">
-                            <h2>📋 No hay bases de datos disponibles</h2>
-                            <p>Asegúrate de compartir al menos una base de datos con la integración de Notion</p>
-                            <button onclick="window.location.reload()" class="btn-primary">Recargar</button>
-                        </div>
-                    `;
-                    return;
-                }
-
-                // Mostrar selector de bases de datos
-                let dbOptions = '';
-                data.databases.forEach(db => {
-                    dbOptions += `
-                        <div style="padding: 16px; border: 2px solid #e5e7eb; border-radius: 8px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s;"
-                             onmouseover="this.style.borderColor='#667eea'"
-                             onmouseout="this.style.borderColor='#e5e7eb'"
-                             onclick="selectDatabase('${db.id}', '${db.title}')">
-                            <div style="font-weight: 600; font-size: 16px; margin-bottom: 4px;">
-                                ${db.icon || '📄'} ${db.title}
-                            </div>
-                            <div style="font-size: 12px; color: #718096;">
-                                Última edición: ${new Date(db.last_edited_time).toLocaleDateString('es-CL')}
-                            </div>
-                        </div>
-                    `;
-                });
-
-                document.getElementById('calendar').innerHTML = `
-                    <div class="setup-message">
-                        <h2>⚙️ Configura tu Base de Datos</h2>
-                        <p>Selecciona la base de datos de Notion que quieres usar como calendario de contenido:</p>
-                        <div style="max-width: 600px; margin: 24px auto; text-align: left;">
-                            ${dbOptions}
-                        </div>
-                    </div>
-                `;
-                document.getElementById('sync-btn').style.display = 'none';
-
-            } catch (error) {
-                console.error('Error loading databases:', error);
-                alert('Error al cargar bases de datos: ' + error.message);
-            }
-        }
-
-        function selectDatabase(databaseId, databaseName) {
-            localStorage.setItem('notion_database_id', databaseId);
-            localStorage.setItem('notion_database_name', databaseName);
-            selectedDatabaseId = databaseId;
-
-            // Recargar para inicializar el calendario
-            window.location.reload();
-        }
-
-        async function connectNotion() {
-            try {
-                const response = await fetch('/.netlify/functions/oauth-notion-initiate', {
+                const response = await fetch('/.netlify/functions/google-calendar-create', {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${sessionToken}` }
                 });
+
                 const data = await response.json();
 
                 if (data.success) {
-                    window.location.href = data.authorization_url;
+                    alert('✅ Calendario creado exitosamente!\n\nPuedes suscribirte en: ' + data.subscription_link);
+                    window.location.reload();
                 } else {
                     throw new Error(data.message);
                 }
             } catch (error) {
-                alert('Error al conectar Notion: ' + error.message);
+                alert('Error al crear calendario: ' + error.message);
+                event.target.disabled = false;
+                event.target.textContent = 'Crear Calendario PVB Marketing';
             }
         }
 
         // Event listeners
-        document.getElementById('sync-btn')?.addEventListener('click', syncNotionEvents);
+        document.getElementById('sync-btn')?.addEventListener('click', syncCalendar);
         document.querySelector('.close')?.addEventListener('click', () => {
             document.getElementById('event-modal').style.display = 'none';
         });

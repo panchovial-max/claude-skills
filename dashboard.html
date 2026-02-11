@@ -216,15 +216,6 @@
                 <div class="card-value">-</div>
                 <div class="card-label">No conectado</div>
             </div>
-
-            <div class="card" id="notion-card">
-                <div class="card-header">
-                    <span class="card-icon">📝</span>
-                    <span class="card-title">Notion</span>
-                </div>
-                <div class="card-value" id="notion-value">-</div>
-                <div class="card-label" id="notion-label">No conectado</div>
-            </div>
         </div>
 
         <div class="card cta-card">
@@ -303,13 +294,6 @@
 
                 if (response.ok) {
                     const data = await response.json();
-
-                    // Update Notion card
-                    if (data.accounts?.notion) {
-                        document.getElementById('notion-value').textContent = '✓';
-                        document.getElementById('notion-label').textContent = 'Conectado';
-                        document.getElementById('notion-value').style.color = '#48bb78';
-                    }
 
                     // Update cards based on connection status
                     // This will be implemented when we have the backend ready

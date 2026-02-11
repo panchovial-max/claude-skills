@@ -297,27 +297,6 @@
                     <p>📊 Última sincronización: hace 30 minutos</p>
                 </div>
             </div>
-
-            <!-- Notion -->
-            <div class="platform-card" id="notion-card" data-platform="notion">
-                <span class="status-badge">✓ Conectado</span>
-                <div class="platform-header">
-                    <div class="platform-info">
-                        <div class="platform-icon">📝</div>
-                        <div class="platform-details">
-                            <h3>Notion</h3>
-                            <p>Calendario de contenido y planificación</p>
-                        </div>
-                    </div>
-                </div>
-                <button class="connect-btn" id="connect-notion-btn" onclick="connectNotion()">
-                    Conectar Ahora
-                </button>
-                <div class="metrics-preview">
-                    <p>📊 Última sincronización: hace 1 hora</p>
-                </div>
-                <div id="notion-status" class="status-message"></div>
-            </div>
         </div>
 
         <div class="back-link">
@@ -381,7 +360,6 @@
                     updatePlatformStatus('meta', data.accounts.meta);
                     updatePlatformStatus('linkedin', data.accounts.linkedin);
                     updatePlatformStatus('tiktok', data.accounts.tiktok);
-                    updatePlatformStatus('notion', data.accounts.notion);
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -426,33 +404,6 @@
             } catch (error) {
                 console.error('Error:', error);
                 alert('Error al conectar con la plataforma');
-            }
-        }
-
-        async function connectNotion() {
-            const btn = document.getElementById('connect-notion-btn');
-            btn.disabled = true;
-            btn.textContent = 'Iniciando...';
-
-            try {
-                const response = await fetch('/.netlify/functions/oauth-notion-initiate', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${sessionToken}`
-                    }
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    window.location.href = data.authorization_url;
-                } else {
-                    throw new Error(data.message);
-                }
-            } catch (error) {
-                document.getElementById('notion-status').textContent = '❌ Error: ' + error.message;
-                btn.disabled = false;
-                btn.textContent = 'Conectar Ahora';
             }
         }
 

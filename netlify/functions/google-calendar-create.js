@@ -63,7 +63,7 @@ export const handler = async (event, context) => {
     // Por ahora asumimos que el token es válido
 
     // Crear calendario
-    const calendarName = `PVB - Contenido ${user.user_metadata?.full_name || user.email}`;
+    const calendarName = `PVB Marketing - ${user.user_metadata?.full_name || user.email}`;
 
     const createResponse = await fetch('https://www.googleapis.com/calendar/v3/calendars', {
       method: 'POST',
@@ -73,7 +73,7 @@ export const handler = async (event, context) => {
       },
       body: JSON.stringify({
         summary: calendarName,
-        description: 'Calendario de contenido programado by PVB',
+        description: 'Calendario de marketing y contenido programado - PVB',
         timeZone: 'America/Santiago'
       })
     });
