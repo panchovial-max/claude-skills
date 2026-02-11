@@ -80,18 +80,21 @@ export const handler = async (event, context) => {
       const { data: userData } = await supabase.auth.admin.getUserById(calendarConn.user_id);
       if (!userData) continue;
 
-      const clientName = userData.user.user_metadata?.full_name || userData.user.email;
+      // Usar EMAIL para matching en Notion (identificador único y consistente)
+      const clientEmail = userData.user.email;
+      const displayName = userData.user.user_metadata?.full_name || userData.user.email;
 
-      // Filtrar eventos de este cliente específico
+      // Filtrar eventos de este cliente específico por EMAIL
       const clientEvents = notionData.results.filter(page => {
         const clientProp = page.properties['Client'] || page.properties['Cliente'];
         if (!clientProp) return false;
 
+        // Comparar con el email del cliente
         if (clientProp.select) {
-          return clientProp.select.name === clientName;
+          return clientProp.select.name === clientEmail;
         }
         if (clientProp.rich_text && clientProp.rich_text.length > 0) {
-          return clientProp.rich_text[0].plain_text === clientName;
+          return clientProp.rich_text[0].plain_text === clientEmail;
         }
         return false;
       });
