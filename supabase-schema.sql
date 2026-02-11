@@ -191,3 +191,52 @@ CREATE POLICY "Users can update their own calendar connection"
 CREATE POLICY "Users can delete their own calendar connection"
     ON google_calendar_connections FOR DELETE
     USING (auth.uid() = user_id);
+
+-- Campaign Comments table (for client-agency communication)
+CREATE TABLE IF NOT EXISTS campaign_comments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id TEXT NOT NULL,           -- Google Calendar event ID or Notion page ID
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    author_name TEXT NOT NULL,         -- Full name of the commenter
+    author_email TEXT NOT NULL,        -- Email of the commenter
+    author_role TEXT NOT NULL CHECK (author_role IN ('client', 'agency')),
+    message TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT false,     -- Track if comment has been read
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for campaign_comments
+CREATE INDEX IF NOT EXISTS idx_comments_event_id ON campaign_comments(event_id);
+CREATE INDEX IF NOT EXISTS idx_comments_user_id ON campaign_comments(user_id);
+CREATE INDEX IF NOT EXISTS idx_comments_created_at ON campaign_comments(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_comments_unread ON campaign_comments(is_read) WHERE is_read = false;
+
+-- RLS for campaign_comments
+ALTER TABLE campaign_comments ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can see comments on their own events
+-- (Events belonging to their calendar/campaigns)
+CREATE POLICY "Users can select comments on their events"
+    ON campaign_comments FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM google_calendar_connections gcc
+            WHERE gcc.user_id = auth.uid()
+        )
+    );
+
+-- Policy: Users can insert comments
+CREATE POLICY "Users can insert comments"
+    ON campaign_comments FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+-- Policy: Users can update their own comments (e.g., mark as read)
+CREATE POLICY "Users can update comments"
+    ON campaign_comments FOR UPDATE
+    USING (true);  -- Allow updates for marking as read by any authorized user
+
+-- Policy: Users can delete their own comments
+CREATE POLICY "Users can delete their own comments"
+    ON campaign_comments FOR DELETE
+    USING (auth.uid() = user_id);
